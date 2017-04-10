@@ -92,7 +92,7 @@ class Budou(object):
     return cls(service)
 
   def parse(self, source, attributes=None, use_cache=True, language='',
-            classname=DEFAULT_CLASS_NAME):
+            use_entity=False, classname=DEFAULT_CLASS_NAME):
     """Parses input HTML code into word chunks and organized code.
 
     Args:
@@ -103,10 +103,12 @@ class Budou(object):
       name of SPAN tags (dictionary|string, optional).
       use_cache: Whether to use cache (boolean, optional).
       language: A language used to parse text (string, optional).
-      classname: A class name of output SPAN tags (string, optional).
-      **This argument is deprecated. Please use attributes arg instead.
-      When specified with the attributes arg, the class name in the attributes
-      arg will be used.**
+      use_entity: Whether to use entities in Natural Language API response.
+      Not that it doubles the number of requests to API, which may result in
+      additional costs (boolean, optional).
+      classname[deprecated]: A class name of output SPAN tags
+      (string, optional).
+      **This argument is deprecated. Please use attributes argument instead.**
 
     Returns:
       A dictionary with the list of word chunks and organized HTML code.
@@ -120,7 +122,7 @@ class Budou(object):
     if language == 'ko':
       chunks = self._get_chunks_per_space(input_text)
     else:
-      chunks = self._get_chunks_with_api(input_text, language)
+      chunks = self._get_chunks_with_api(input_text, language, use_entity)
     chunks = self._migrate_html(chunks, dom)
     attributes = self._get_attribute_dict(attributes, classname)
     html_code = self._spanize(chunks, attributes)
@@ -147,12 +149,14 @@ class Budou(object):
       chunks.append(Chunk(u' ', SPACE_POS, SPACE_POS, True))
     return chunks[:-1]
 
-  def _get_chunks_with_api(self, input_text, language):
+  def _get_chunks_with_api(self, input_text, language, use_entity):
     """Returns a list of chunks by using Natural Language API.
 
     Args:
       input_text: String to parse.
       language: A language used to parse text (string, optional).
+      use_entity: Whether to use entities in Natural Language API response
+      (boolean, optional).
 
     Returns:
       A list of Chunks.
@@ -162,6 +166,10 @@ class Budou(object):
       condition = lambda chunk: (
           chunk.label in TARGET_LABEL or chunk.pos == 'PUNCT')
       chunks = self._concatenate_inner(chunks, condition, forward)
+    if use_entity:
+      print('use entities')
+      entities = self._get_entities(input_text, language)
+      chunks = self._concatenate_entities(chunks, entities)
     return chunks
 
   def _get_attribute_dict(self, attributes, classname=None):
@@ -206,6 +214,23 @@ class Budou(object):
     request = self.service.documents().annotateText(body=body)
     response = request.execute()
     return response.get('tokens', [])
+
+  def _get_entities(self, text, language='', encoding='UTF32'):
+    """Returns the list of annotations from the given text."""
+    body = {
+        'document': {
+            'type': 'PLAIN_TEXT',
+            'content': text,
+        },
+        'encodingType': encoding,
+    }
+
+    if language:
+      body['document']['language'] = language
+
+    request = self.service.documents().analyzeEntities(body=body)
+    response = request.execute()
+    return response.get('entities', [])
 
   def _preprocess(self, source):
     """Removes unnecessary break lines and whitespaces.
@@ -265,14 +290,23 @@ class Budou(object):
       index = 0
       concat_chunks = []
       for chunk in chunks:
+        # If there is not overrap between the chunk and HTML element, just
+        # append the chunk to the output.
         if (index + len(chunk.word) <= element.index or
             element.index + len(element.text) <= index):
           result.append(chunk)
+
+        # If the chunk contains the HTML element completely, append the chunk
+        # as a HTML chunk.
         elif (index <= element.index and
               element.index + len(element.text) <= index + len(chunk.word)):
           result.append(Chunk(
               chunk.word.replace(element.text, element.source),
               HTML_POS, HTML_POS, True))
+
+        # If the HTML element's end is in the middle of a chunk, add it to the
+        # temporary chunk and empty them by appending a concatenated chunk into
+        # the output.
         elif (index < element.index + len(element.text) and
               element.index + len(element.text) <= index + len(chunk.word)):
           concat_chunks.append(chunk)
@@ -280,6 +314,8 @@ class Budou(object):
           new_word = new_word.replace(element.text, element.source)
           result.append(Chunk(new_word, HTML_POS, HTML_POS, True))
           concat_chunks = []
+
+        # Otherwise, add the chunk into the temporary chunk list.
         else:
           concat_chunks.append(chunk)
         index += len(chunk.word)
@@ -359,3 +395,6 @@ class Budou(object):
     if tmp_bucket: result += tmp_bucket
     if not forward: result = result[::-1]
     return result
+
+  def _concatenate_entities(self, chunks, entities):
+    pass
