@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright 2016 Google Inc. All rights reserved.
+# Copyright 2017 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 """Budou, an automatic CJK line break organizer."""
 
-from . import cachefactory
+from . import api, cachefactory
 import collections
 from googleapiclient import discovery
 import httplib2
@@ -28,31 +28,173 @@ import re
 import six
 import unicodedata
 
-Chunk = collections.namedtuple('Chunk', ['word', 'pos', 'label', 'forward'])
-"""Word chunk object.
-
-Args:
-  word: Surface word of the chunk. (unicode)
-  pos: Part of speech. (string)
-  label: Label information. (string)
-  forward: Whether the word depends on the following words. (boolean)
-"""
+cache = cachefactory.load_cache()
 
 Element = collections.namedtuple('Element', ['text', 'tag', 'source', 'index'])
 """HTML element object.
 
-Args:
-  text: Text of the element (unicode).
-  tag: Tag name of the element (string).
-  source: HTML source of the element (string).
-  index: Character-wise offset from the top of the sentence (number).
+Attributes:
+  text: Text of the element. (unicode)
+  tag: Tag name of the element. (string)
+  source: HTML source of the element. (string)
+  index: Character-wise offset from the top of the sentence. (integer)
 """
 
-SPACE_POS = 'SPACE'
-HTML_POS = 'HTML'
-DEFAULT_CLASS_NAME = 'ww'
-TARGET_LABEL = ('P', 'SNUM', 'PRT', 'AUX', 'SUFF', 'MWV', 'AUXPASS', 'AUXVV')
-cache = cachefactory.load_cache()
+
+class Chunk(object):
+  """Chunk object. This represents a unit for word segmentation.
+
+  Attributes:
+    word: Surface word of the chunk. (unicode)
+    pos: Part of speech. (string)
+    label: Label information. (string)
+    dependency: Dependency to neighbor words. None for no dependency, True for
+    dependency to the following word, and False for the dependency to the
+    previous word. (?boolean)
+  """
+  SPACE_POS = 'SPACE'
+  HTML_POS = 'HTML'
+  DEPENDENT_LABEL = (
+      'P', 'SNUM', 'PRT', 'AUX', 'SUFF', 'MWV', 'AUXPASS', 'AUXVV', 'RDROP',
+      'NUMBER', 'NUM')
+
+  def __init__(self, word, pos=None, label=None, dependency=None):
+    self.word = word
+    self.pos = pos
+    self.label = label
+    self.dependency = dependency
+    self._add_dependency_if_punct()
+
+  def __repr__(self):
+    return '<Chunk %s pos: %s, label: %s, dependency: %s>' % (
+        self.word, self.pos, self.label, self.dependency)
+
+  @classmethod
+  def space(cls):
+    """Creates space Chunk."""
+    chunk = cls(u' ', cls.SPACE_POS)
+    return chunk
+
+  @classmethod
+  def html(cls, html_code):
+    """Creates HTML Chunk."""
+    chunk = cls(html_code, cls.HTML_POS)
+    return chunk
+
+  def is_space(self):
+    """Checks if this is space Chunk."""
+    return self.pos == self.SPACE_POS
+
+  def update_as_html(self, word):
+    """Updates the chunk as HTML chunk with the given word."""
+    self.word = word
+    self.pos = self.HTML_POS
+
+  def update_word(self, word):
+    """Updates the word of the chunk."""
+    self.word = word
+
+  def serialize(self):
+    """Returns serialized chunk data in dictionary."""
+    return {
+      'word': self.word,
+      'pos': self.pos,
+      'label': self.label,
+      'dependency': self.dependency
+    }
+
+  def maybe_add_dependency(self, default_dependency_direction):
+    """Adds dependency if any dependency is not assigned yet."""
+    if self.dependency == None and self.label in self.DEPENDENT_LABEL:
+      self.dependency = default_dependency_direction
+
+  def _add_dependency_if_punct(self):
+    """Adds dependency if the chunk is punctuation."""
+    if self.pos == 'PUNCT':
+      try:
+        # Getting unicode category to determine the direction.
+        # Concatenates to the following if it belongs to Ps or Pi category.
+        # Ps: Punctuation, open (e.g. opening bracket characters)
+        # Pi: Punctuation, initial quote (e.g. opening quotation mark)
+        # Otherwise, concatenates to the previous word.
+        # See also https://en.wikipedia.org/wiki/Unicode_character_property
+        category = unicodedata.category(self.word)
+        self.dependency = category in ('Ps', 'Pi')
+      except:
+        pass
+
+
+class ChunkQueue(object):
+  """Chunk queue object.
+
+  Attributes:
+    chunks: List of included chunks.
+  """
+  def __init__(self):
+    self.chunks = []
+
+  def add(self, chunk):
+    """Adds a chunk to the chunk list."""
+    self.chunks.append(chunk)
+
+  def resolve_dependency(self):
+    """Resolves chunk dependency by concatenating them."""
+    self._concatenate_inner(True)
+    self._concatenate_inner(False)
+
+  def _concatenate_inner(self, direction):
+    """Concatenates chunks based on each chunk's dependency.
+
+    Args:
+      direction: Direction of concatenation process.
+    """
+    result = []
+    tmp_bucket = []
+    chunks = self.chunks if direction else self.chunks[::-1]
+    for chunk in chunks:
+      if chunk.dependency == direction:
+        tmp_bucket.append(chunk)
+        continue
+      tmp_bucket.append(chunk)
+      if not direction: tmp_bucket = tmp_bucket[::-1]
+      new_word = ''.join([tmp_chunk.word for tmp_chunk in tmp_bucket])
+      chunk.update_word(new_word)
+      result.append(chunk)
+      tmp_bucket = []
+    if tmp_bucket: result += tmp_bucket
+    self.chunks = result if direction else result[::-1]
+
+  def get_overlaps(self, offset, length):
+    """Returns chunks overlapped with the given range.
+
+    Args:
+      offset: Begin offset of the range. (int)
+      length: Length of the range. (int)
+
+    Returns:
+      List of Chunk.
+    """
+    # In case entity's offset points to a space just before the entity.
+    if ''.join([chunk.word for chunk in self.chunks])[offset] == ' ':
+      offset += 1
+    index = 0
+    result = []
+    for chunk in self.chunks:
+      if (offset < index + len(chunk.word) and index < offset + length):
+        result.append(chunk)
+      index += len(chunk.word)
+    return result
+
+  def swap(self, old_chunks, new_chunk):
+    """Swaps old consecutive chunks with new chunk.
+
+    Args:
+      old_chunks: List of consecutive Chunks to be removed.
+      new_chunk: Chunk to be inserted.
+    """
+    indexes = [self.chunks.index(chunk) for chunk in old_chunks]
+    del self.chunks[indexes[0]:indexes[-1] + 1]
+    self.chunks.insert(indexes[0], new_chunk)
 
 
 class Budou(object):
@@ -61,6 +203,7 @@ class Budou(object):
   Attributes:
     service: A Resource object with methods for interacting with the service.
   """
+  DEFAULT_CLASS_NAME = 'ww'
 
   def __init__(self, service):
     self.service = service
@@ -93,7 +236,7 @@ class Budou(object):
     return cls(service)
 
   def parse(self, source, attributes=None, use_cache=True, language='',
-            use_entity=False, classname=DEFAULT_CLASS_NAME):
+            use_entity=False, classname=None):
     """Parses input HTML code into word chunks and organized code.
 
     Args:
@@ -120,15 +263,19 @@ class Budou(object):
     source = self._preprocess(source)
     dom = html.fragment_fromstring(source, create_parent='body')
     input_text = dom.text_content()
+
     if language == 'ko':
-      chunks = self._get_chunks_per_space(input_text)
+      # Korean has spaces between words, so this simply parses words by space
+      # and wrap them as chunks.
+      queue = self._get_chunks_per_space(input_text)
     else:
-      chunks = self._get_chunks_with_api(input_text, language, use_entity)
-    chunks = self._migrate_html(chunks, dom)
+      queue = self._get_chunks_with_api(input_text, language, use_entity)
+    elements = self._get_elements_list(dom)
+    queue = self._migrate_html(queue, elements)
     attributes = self._get_attribute_dict(attributes, classname)
-    html_code = self._spanize(chunks, attributes)
+    html_code = self._spanize(queue, attributes)
     result_value = {
-        'chunks': chunks,
+        'chunks': [chunk.serialize() for chunk in queue.chunks],
         'html_code': html_code
     }
     if use_cache:
@@ -144,11 +291,13 @@ class Budou(object):
     Returns:
       A list of Chunks.
     """
-    chunks = []
-    for word in input_text.split():
-      chunks.append(Chunk(word, None, None, True))
-      chunks.append(Chunk(u' ', SPACE_POS, SPACE_POS, True))
-    return chunks[:-1]
+    queue = ChunkQueue()
+    words = input_text.split()
+    for i, word in enumerate(words):
+      queue.add(Chunk(word))
+      if i < len(words) - 1:  # Add no space after the last word.
+        queue.add(Chunk.space())
+    return queue
 
   def _get_chunks_with_api(self, input_text, language, use_entity):
     """Returns a list of chunks by using Natural Language API.
@@ -162,46 +311,12 @@ class Budou(object):
     Returns:
       A list of Chunks.
     """
-    chunks = self._get_source_chunks(input_text, language)
-    chunks = self._update_punct_direction(chunks)
-    for forward in (True, False):
-      condition = lambda chunk: (
-          chunk.label in TARGET_LABEL or chunk.pos == 'PUNCT')
-      chunks = self._concatenate_inner(chunks, condition, forward)
+    queue = self._get_source_chunks(input_text, language)
     if use_entity:
-      print('use entities')
-      entities = self._get_entities(input_text, language)
-      chunks = self._concatenate_entities(chunks, entities)
-    return chunks
-
-  def _update_punct_direction(self, chunks):
-    """Updates chunk's concatenate direction if it is a punctuation mark.
-
-    Args:
-      chunks: A list of Chunks.
-
-    Returns:
-      A list of updated Chunks.
-    """
-    result = []
-    for chunk in chunks:
-      if chunk.pos == 'PUNCT':
-        forward = False
-        try:
-          # Getting unicode category to determine the direction.
-          # Concatenates to the following if it belongs to Ps or Pi category.
-          # Ps: Punctuation, open (e.g. opening bracket characters)
-          # Pi: Punctuation, initial quote (e.g. opening quotation mark)
-          # Otherwise, concatenates to the previous word.
-          # See also https://en.wikipedia.org/wiki/Unicode_character_property
-          category = unicodedata.category(chunk.word)
-          if category in ('Ps', 'Pi'):
-            forward = True
-        except:
-          pass
-        chunk = Chunk(chunk.word, chunk.pos, chunk.label, forward)
-      result.append(chunk)
-    return result
+      entities = api.get_entities(self.service, input_text, language)
+      queue = self._group_chunks_by_entities(queue, entities)
+    queue.resolve_dependency()
+    return queue
 
   def _get_attribute_dict(self, attributes, classname=None):
     """Returns a dictionary of attribute name-value pairs.
@@ -222,46 +337,9 @@ class Budou(object):
     if not attributes:
       attributes = {}
     if not classname:
-      classname = DEFAULT_CLASS_NAME
+      classname = self.DEFAULT_CLASS_NAME
     attributes.setdefault('class', classname)
     return attributes
-
-  def _get_annotations(self, text, language='', encoding='UTF32'):
-    """Returns the list of annotations from the given text."""
-    body = {
-        'document': {
-            'type': 'PLAIN_TEXT',
-            'content': text,
-        },
-        'features': {
-            'extract_syntax': True,
-        },
-        'encodingType': encoding,
-    }
-
-    if language:
-      body['document']['language'] = language
-
-    request = self.service.documents().annotateText(body=body)
-    response = request.execute()
-    return response.get('tokens', [])
-
-  def _get_entities(self, text, language='', encoding='UTF32'):
-    """Returns the list of annotations from the given text."""
-    body = {
-        'document': {
-            'type': 'PLAIN_TEXT',
-            'content': text,
-        },
-        'encodingType': encoding,
-    }
-
-    if language:
-      body['document']['language'] = language
-
-    request = self.service.documents().analyzeEntities(body=body)
-    response = request.execute()
-    return response.get('entities', [])
 
   def _preprocess(self, source):
     """Removes unnecessary break lines and whitespaces.
@@ -287,71 +365,59 @@ class Budou(object):
     Returns:
       A list of word chunk objects (list).
     """
-    chunks = []
+    queue = ChunkQueue()
     sentence_length = 0
-    tokens = self._get_annotations(input_text, language)
+    tokens = api.get_annotations(self.service, input_text, language)
     for token in tokens:
       word = token['text']['content']
       begin_offset = token['text']['beginOffset']
       label = token['dependencyEdge']['label']
       pos = token['partOfSpeech']['tag']
       if begin_offset > sentence_length:
-        chunks.append(Chunk(u' ', SPACE_POS, SPACE_POS, True))
+        queue.add(Chunk.space())
         sentence_length = begin_offset
-      chunks.append(Chunk(
-          word, pos, label,
-          # Determining the direction based on syntax dependency.
-          tokens.index(token) < token['dependencyEdge']['headTokenIndex']))
+      chunk = Chunk(word, pos, label)
+      # Determining default concatenating direction based on syntax dependency.
+      chunk.maybe_add_dependency(
+          tokens.index(token) < token['dependencyEdge']['headTokenIndex'])
+      queue.add(chunk)
       sentence_length += len(word)
-    return chunks
+    return queue
 
-  def _migrate_html(self, chunks, dom):
+  def _migrate_html(self, queue, elements):
     """Migrates HTML elements to the word chunks by bracketing each element.
 
     Args:
-      chunks: The list of word chunks to be processed.
-      dom: DOM to access the given HTML source.
+      queue: The list of word chunks to be processed.
+      elements: List of Element.
 
     Returns:
       A list of processed word chunks.
     """
-    elements = self._get_elements_list(dom)
     for element in elements:
-      result = []
-      index = 0
-      concat_chunks = []
-      for chunk in chunks:
-        # If there is not overrap between the chunk and HTML element, just
-        # append the chunk to the output.
-        if (index + len(chunk.word) <= element.index or
-            element.index + len(element.text) <= index):
-          result.append(chunk)
+      concat_chunks = queue.get_overlaps(element.index, len(element.text))
+      if not concat_chunks: continue
+      new_chunk_word = u''.join([chunk.word for chunk in concat_chunks])
+      new_chunk_word = new_chunk_word.replace(element.text, element.source)
+      new_chunk = Chunk.html(new_chunk_word)
+      queue.swap(concat_chunks, new_chunk)
+    return queue
 
-        # If the chunk contains the HTML element completely, append the chunk
-        # as a HTML chunk.
-        elif (index <= element.index and
-              element.index + len(element.text) <= index + len(chunk.word)):
-          result.append(Chunk(
-              chunk.word.replace(element.text, element.source),
-              HTML_POS, HTML_POS, True))
+  def _group_chunks_by_entities(self, queue, entities):
+    """Groups chunks by entities retrieved from NL API.
 
-        # If the HTML element's end is in the middle of a chunk, add it to the
-        # temporary chunk and empty them by appending a concatenated chunk into
-        # the output.
-        elif (index < element.index + len(element.text) and
-              element.index + len(element.text) <= index + len(chunk.word)):
-          concat_chunks.append(chunk)
-          new_word = u''.join([c_chunk.word for c_chunk in concat_chunks])
-          new_word = new_word.replace(element.text, element.source)
-          result.append(Chunk(new_word, HTML_POS, HTML_POS, True))
-          concat_chunks = []
-
-        # Otherwise, add the chunk into the temporary chunk list.
-        else:
-          concat_chunks.append(chunk)
-        index += len(chunk.word)
-      chunks = result
-    return chunks
+    Args:
+      queue: ChunkQueue.
+      entities: List of entities.
+    """
+    for entity in entities:
+      concat_chunks = queue.get_overlaps(
+          entity['beginOffset'], len(entity['content']))
+      if not concat_chunks: continue
+      new_chunk_word = u''.join([chunk.word for chunk in concat_chunks])
+      new_chunk = Chunk(new_chunk_word)
+      queue.swap(concat_chunks, new_chunk)
+    return queue
 
   def _get_elements_list(self, dom):
     """Digs DOM to the first depth and returns the list of elements.
@@ -362,7 +428,7 @@ class Budou(object):
     Returns:
       A list of elements.
     """
-    result = []
+    elements = []
     index = 0
     if dom.text:
       index += len(dom.text)
@@ -372,16 +438,16 @@ class Budou(object):
           encoding='utf8').decode('utf8')
       source = etree.tostring(
           element, with_tail=False, encoding='utf8').decode('utf8')
-      result.append(Element(text, element.tag, source, index))
+      elements.append(Element(text, element.tag, source, index))
       index += len(text)
       if element.tail: index += len(element.tail)
-    return result
+    return elements
 
-  def _spanize(self, chunks, attributes):
+  def _spanize(self, queue, attributes):
     """Returns concatenated HTML code with SPAN tag.
 
     Args:
-      chunks: The list of word chunks.
+      queue: The list of word chunks.
       attributes: If a dictionary, then a map of name-value pairs for attributes
       of output SPAN tags. If a string, then this is the class name of output
       SPAN tags. If an array, the elements will be joined together as the
@@ -391,41 +457,11 @@ class Budou(object):
       The organized HTML code.
     """
     result = []
-    for chunk in chunks:
-      if chunk.pos == SPACE_POS:
+    for chunk in queue.chunks:
+      if chunk.is_space():
         result.append(chunk.word)
       else:
         attribute_str = ' '.join(
             '%s="%s"' % (k, v) for k, v in sorted(attributes.items()))
         result.append('<span %s>%s</span>' % (attribute_str, chunk.word))
     return ''.join(result)
-
-  def _concatenate_inner(self, chunks, condition, forward=True):
-    """Concatenates chunks based on the label and direction.
-
-    Args:
-      chunks: The list of word chunks.
-      condition: The function to check if each chunk should be concatenated.
-      forward: Concatenation direction.
-
-    Returns:
-      The processed word chunks.
-    """
-    result = []
-    tmp_bucket = []
-    if not forward: chunks = chunks[::-1]
-    for chunk in chunks:
-      if condition(chunk) and chunk.forward == forward:
-        tmp_bucket.append(chunk)
-        continue
-      tmp_bucket.append(chunk)
-      if not forward: tmp_bucket = tmp_bucket[::-1]
-      new_word = ''.join([tmp_chunk.word for tmp_chunk in tmp_bucket])
-      result.append(Chunk(new_word, chunk.pos, chunk.label, chunk.forward))
-      tmp_bucket = []
-    if tmp_bucket: result += tmp_bucket
-    if not forward: result = result[::-1]
-    return result
-
-  def _concatenate_entities(self, chunks, entities):
-    pass
