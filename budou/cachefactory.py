@@ -20,77 +20,58 @@ import pickle
 import os
 
 
-def load_cache():
+def load_cache(filename):
   try:
-    from google.appengine.api import memcache
+    return AppEngineMemcache()
   except:
-    return PickleCache()
-  else:
-    return AppEngineCache(memcache)
+    return PickleCache(filename)
 
 
 @six.add_metaclass(ABCMeta)
 class BudouCache(object):
 
-  CACHE_SALT = '2017-04-13'
-  DEFAULT_FILE_PATH = './budou-cache.pickle'
-
-  def __repr__(self):
-    return '<%s>' % (self.__class__.__name__)
-
   @abstractmethod
-  def get(self, source, language):
+  def get(self, key):
     pass
 
   @abstractmethod
-  def set(self, source, language, value):
+  def set(self, key, val):
     pass
-
-  def _get_cache_key(self, source, language):
-    """Returns a cache key for the given source and class name."""
-    key_source = u'%s:%s:%s' % (self.CACHE_SALT, source, language)
-    return hashlib.md5(key_source.encode('utf8')).hexdigest()
 
 
 class PickleCache(BudouCache):
 
-  def __init__(self, filepath = None):
-    self.filepath = filepath if filepath else self.DEFAULT_FILE_PATH
+  def __init__(self, filename):
+    self.filename = filename
 
-  def get(self, source, language):
-    self._create_file_if_none_exists()
-    with open(self.filepath, 'rb') as file_object:
-      cache_pickle = pickle.load(file_object)
-      cache_key = self._get_cache_key(source, language)
-      result_value = cache_pickle[cache_key]
-      return result_value
+  def get(self, key):
+    if not os.path.exists(self.filename): return None
+    with open(self.filename, 'rb') as f:
+      try:
+        cache_pickle = pickle.load(f)
+      except EOFError:
+        cache_pickle = {}
+      return cache_pickle.get(key, None)
 
-  def set(self, source, language, value):
-    self._create_file_if_none_exists()
-    with open(self.filepath, 'r+b') as file_object:
-      cache_pickle = pickle.load(file_object)
-      cache_key = self._get_cache_key(source, language)
-      cache_pickle[cache_key] = value
-      file_object.seek(0)
-      pickle.dump(cache_pickle, file_object)
-
-  def _create_file_if_none_exists(self):
-    if os.path.exists(self.filepath):
-      return
-    with open(self.filepath, 'wb') as file_object:
-      pickle.dump({}, file_object)
+  def set(self, key, val):
+    with open(self.filename, 'w+b') as f:
+      try:
+        cache_pickle = pickle.load(f)
+      except EOFError:
+        cache_pickle = {}
+      cache_pickle[key] = val
+      f.seek(0)
+      pickle.dump(cache_pickle, f)
 
 
-class AppEngineCache(BudouCache):
+class AppEngineMemcache(BudouCache):
 
-  def __init__(self, memcache):
+  def __init__(self):
+    from google.appengine.api import memcache
     self.memcache = memcache
 
-  def get(self, source, language):
-    cache_key = self._get_cache_key(source, language)
-    result_value = self.memcache.get(cache_key, None)
-    return result_value
+  def get(self, key):
+    return self.memcache.get(key, None)
 
-  def set(self, source, language, value):
-    cache_key = self._get_cache_key(source, language)
-    self.memcache.set(cache_key, value)
+  def set(self, key, value):
+    self.memcache.set(key, val)

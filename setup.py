@@ -19,9 +19,14 @@ def read_file(name):
   with open(os.path.join(os.path.dirname(__file__), name), 'r') as f:
     return f.read().strip()
 
+about = {}
+with open(os.path.join(os.path.abspath(os.path.dirname(__file__)),
+  'budou', '__version__.py')) as f:
+  exec(f.read(), about)
+
 setup(
     name='budou',
-    version='0.8.10',
+    version=about['__version__'],
     author='Shuhei Iitsuka',
     author_email='tushuhei@google.com',
     description='CJK Line Break Organizer',
@@ -32,7 +37,7 @@ setup(
     tests_require=read_file('requirements_dev.txt').splitlines(),
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    test_suite='test',
+    test_suite='tests',
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Operating System :: OS Independent',
@@ -40,4 +45,7 @@ setup(
         'License :: OSI Approved :: Apache Software License',
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
+    entry_points = {
+        'console_scripts': ['budou=budou.budou:main'],
+    }
 )
