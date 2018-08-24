@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Chunk module as a unit of word segment with helpers.
+"""
+
 import collections
 from xml.etree import ElementTree as ET
 import unicodedata
@@ -153,6 +156,14 @@ class ChunkList(collections.MutableSequence):
     self.extend(list(args))
 
   def _check(self, val):
+    """Checks if the value is an instance of :obj:`budou.chunk.Chunk`.
+
+    Args:
+      val (:obj:`budou.chunk.Chunk`): input to check
+
+    Raises:
+      TypeError: If :code:`val` is not an instance of :obj:`budou.chunk.Chunk`.
+    """
     if not isinstance(val, Chunk):
       raise TypeError
 
@@ -271,38 +282,26 @@ class ChunkList(collections.MutableSequence):
     """
     doc = ET.Element('span')
     for chunk in self:
-      if chunk.is_space():
+      if (chunk.has_cjk() and
+          not (max_length and len(chunk.word) > max_length)):
+        ele = ET.Element('span')
+        ele.text = chunk.word
+        for key, val in attributes.items():
+          ele.attrib[key] = val
+        doc.append(ele)
+      else:
+        # add word without span tag for non-CJK text (e.g. English)
+        # by appending it after the last element
         if doc.getchildren():
           if doc.getchildren()[-1].tail is None:
-            doc.getchildren()[-1].tail = ' '
+            doc.getchildren()[-1].tail = chunk.word
           else:
-            doc.getchildren()[-1].tail += ' '
+            doc.getchildren()[-1].tail += chunk.word
         else:
-          if doc.text is not None:
-            # We want to preserve space in cases like "Hello 你好"
-            # But the space in " 你好" can be discarded.
-            doc.text += ' '
-      else:
-        if (chunk.has_cjk() and
-            not (max_length and len(chunk.word) > max_length)):
-          ele = ET.Element('span')
-          ele.text = chunk.word
-          for key, val in attributes.items():
-            ele.attrib[key] = val
-          doc.append(ele)
-        else:
-          # add word without span tag for non-CJK text (e.g. English)
-          # by appending it after the last element
-          if doc.getchildren():
-            if doc.getchildren()[-1].tail is None:
-              doc.getchildren()[-1].tail = chunk.word
-            else:
-              doc.getchildren()[-1].tail += chunk.word
+          if doc.text is None:
+            doc.text = chunk.word
           else:
-            if doc.text is None:
-              doc.text = chunk.word
-            else:
-              doc.text += chunk.word
+            doc.text += chunk.word
     result = ET.tostring(doc, encoding='utf-8').decode('utf-8')
     result = html5lib.serialize(
         html5lib.parseFragment(result), sanitize=True,
