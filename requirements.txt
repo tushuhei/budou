@@ -6,3 +6,4 @@ html5lib==1.0b10
 docopt
 six
 mecab-python3
+future

@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import unicode_literals
+from builtins import str
 from .segmenter import Segmenter
 from .cachefactory import load_cache
 from .chunk import Chunk, ChunkList

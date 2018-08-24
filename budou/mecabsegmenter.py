@@ -14,15 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import unicode_literals
 from .segmenter import Segmenter
 from .chunk import Chunk, ChunkList
 import MeCab
 import six
 
 DEPENDENT_POS_FORWARD = set()
-DEPENDENT_POS_BACKWARD = {u'助詞', u'助動詞'}
+DEPENDENT_POS_BACKWARD = {'助詞', '助動詞'}
 DEPENDENT_LABEL_FORWARD = set()
-DEPENDENT_LABEL_BACKWARD = {u'非自立'}
+DEPENDENT_LABEL_BACKWARD = {'非自立'}
 
 class MecabSegmenter(Segmenter):
 
