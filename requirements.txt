@@ -7,3 +7,4 @@ docopt
 six
 mecab-python3
 future
+chardet
