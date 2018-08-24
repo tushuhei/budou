@@ -17,7 +17,7 @@
 """budou:
 
 Usage:
-  budou <source> [--segmenter=<segmenter>] [--language=<language>] [--classname=<classname>]
+  budou <source> [--segmenter=<seg>] [--language=<lang>] [--classname=<class>]
   budou -h | --help
   budou -v | --version
 
@@ -27,14 +27,16 @@ Options:
   --segmenter=<segmenter>     Segmenter to use [default: nlapi].
   --language=<language>       Language the source in.
   --classname=<classname>     Class name for output SPAN tags.
-                              Use comma-separated value to specify multiple classes.
+                              Use comma-separated value to specify multiple
+                              classes.
 """
 
 from __future__ import print_function
+
+import sys
+from docopt import docopt
 from .parser import NLAPIParser, MecabParser
 from .__version__ import __version__
-from docopt import docopt
-import sys
 
 def main():
   args = docopt(__doc__)
@@ -51,7 +53,7 @@ def main():
   sys.exit()
 
 def parse(source, segmenter='nlapi', language=None, classname=None,
-    options=None):
+          options=None):
   parser = get_parser(segmenter, options=options)
   return parser.parse(source, language=language, classname=classname)
 

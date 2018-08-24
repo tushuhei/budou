@@ -14,16 +14,15 @@
 
 """Budou cache factory class."""
 from abc import ABCMeta, abstractmethod
-import hashlib
-import six
-import pickle
 import os
+import pickle
+import six
 
 
 def load_cache(filename):
   try:
     return AppEngineMemcache()
-  except:
+  except ImportError:
     return PickleCache(filename)
 
 
@@ -45,23 +44,24 @@ class PickleCache(BudouCache):
     self.filename = filename
 
   def get(self, key):
-    if not os.path.exists(self.filename): return None
-    with open(self.filename, 'rb') as f:
+    if not os.path.exists(self.filename):
+      return None
+    with open(self.filename, 'rb') as cache_file:
       try:
-        cache_pickle = pickle.load(f)
+        cache_pickle = pickle.load(cache_file)
       except EOFError:
         cache_pickle = {}
       return cache_pickle.get(key, None)
 
   def set(self, key, val):
-    with open(self.filename, 'w+b') as f:
+    with open(self.filename, 'w+b') as cache_file:
       try:
-        cache_pickle = pickle.load(f)
+        cache_pickle = pickle.load(cache_file)
       except EOFError:
         cache_pickle = {}
       cache_pickle[key] = val
-      f.seek(0)
-      pickle.dump(cache_pickle, f)
+      cache_file.seek(0)
+      pickle.dump(cache_pickle, cache_file)
 
 
 class AppEngineMemcache(BudouCache):
@@ -73,5 +73,5 @@ class AppEngineMemcache(BudouCache):
   def get(self, key):
     return self.memcache.get(key, None)
 
-  def set(self, key, value):
+  def set(self, key, val):
     self.memcache.set(key, val)
