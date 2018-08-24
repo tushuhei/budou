@@ -20,17 +20,28 @@ import unicodedata
 import html5lib
 
 class Chunk(object):
-  """Chunk object. This represents a unit for word segmentation.
+  """A unit for word segmentation.
+
   Attributes:
-    word: Surface word of the chunk. (str)
-    pos: Part of speech. (str)
-    label: Label information. (str)
-    dependency: Dependency to neighbor words. None for no dependency, True for
-        dependency to the following word, and False for the dependency to the
-        previous word. (bool or None)
+    word (str): Surface word of the chunk.
+    pos (:obj:`str`, optional): Part of speech.
+    label (:obj:`str`, optional): Label information.
+    dependency (:obj:`bool`, optional): Dependency to neighbor words.
+        :code:`None` for no dependency, :code:`True` for dependency to the
+        following word, and :code:`False` for the dependency to the previous
+        word.
+
+  Args:
+    word (str): Surface word of the chunk.
+    pos (:obj:`str`, optional): Part of speech.
+    label (:obj:`str`, optional): Label information.
+    dependency (:obj:`bool`, optional): Dependency to neighbor words.
+        :code:`None` for no dependency, :code:`True` for dependency to the
+        following word, and :code:`False` for the dependency to the previous
+        word.
   """
-  SPACE_POS = 'SPACE'
-  BREAK_POS = 'BREAK'
+  _SPACE_POS = 'SPACE'
+  _BREAK_POS = 'BREAK'
 
   def __init__(self, word, pos=None, label=None, dependency=None):
     self.word = word
@@ -44,18 +55,23 @@ class Chunk(object):
 
   @classmethod
   def space(cls):
-    """Creates space Chunk."""
-    chunk = cls(u' ', cls.SPACE_POS)
+    """Creates space Chunk.
+
+    Returns:
+      A chunk (:obj:`budou.chunk.Chunk`)
+    """
+    chunk = cls(u' ', cls._SPACE_POS)
     return chunk
 
   @classmethod
   def breakline(cls):
-    """Creates breakline Chunk."""
-    chunk = cls(u'\n', cls.BREAK_POS)
-    return chunk
+    """Creates breakline Chunk.
 
-  def activate_dependency(self):
-    pass
+    Returns:
+      A chunk (:obj:`budou.chunk.Chunk`)
+    """
+    chunk = cls(u'\n', cls._BREAK_POS)
+    return chunk
 
   def serialize(self):
     """Returns serialized chunk data in dictionary."""
@@ -68,24 +84,43 @@ class Chunk(object):
     }
 
   def is_space(self):
-    """Checks if this is space Chunk."""
-    return self.pos == self.SPACE_POS
+    """Whether the chunk is a space.
+
+    Returns:
+      bool: True if it is a space.
+    """
+    return self.pos == self._SPACE_POS
 
   def is_punct(self):
-    # Getting unicode category to determine the direction.
-    # See also https://en.wikipedia.org/wiki/Unicode_character_property
+    """Whether the chunk is a punctuation mark.
+
+    See also https://en.wikipedia.org/wiki/Unicode_character_property
+
+    Returns:
+      bool: True if it is a punctuation mark.
+    """
     return len(self.word) == 1 and unicodedata.category(self.word)[0] == 'P'
 
   def is_open_punct(self):
-    # Getting unicode category to determine the direction.
-    # Ps: Punctuation, open (e.g. opening bracket characters)
-    # Pi: Punctuation, initial quote (e.g. opening quotation mark)
-    # See also https://en.wikipedia.org/wiki/Unicode_character_property
+    """Whether the chunk is an open punctuation mark.
+
+    Ps: Punctuation, open (e.g. opening bracket characters)
+    Pi: Punctuation, initial quote (e.g. opening quotation mark)
+    See also https://en.wikipedia.org/wiki/Unicode_character_property
+
+    Returns:
+      bool: True if it is an open punctuation mark.
+    """
     return self.is_punct() and unicodedata.category(self.word) in {'Ps', 'Pi'}
 
   def has_cjk(self):
-    """Checks if the word of the chunk contains CJK characters using ranges from
+    """Checks if the word of the chunk contains CJK characters.
+
+    This is using unicode codepoint ranges from
     https://github.com/nltk/nltk/blob/develop/nltk/tokenize/util.py#L149
+
+    Returns:
+      bool: True if the chunk has any CJK character.
     """
     for char in self.word:
       if any([start <= ord(char) <= end for start, end in [
@@ -96,13 +131,28 @@ class Chunk(object):
 
 
 class ChunkList(collections.MutableSequence):
-  """Chunk list. """
+  """List of :obj:`budou.chunk.Chunk` with some helpers.
+
+  This list accepts only instances of :obj:`budou.chunk.Chunk`.
+
+  Example:
+    .. code-block:: python
+
+       from budou.chunk import Chunk, ChunkList
+       chunks = ChunkList(Chunk('abc'), Chunk('def'))
+       chunks.append(Chunk('ghi'))  # OK
+       chunks.append('jkl')         # NG
+
+  Args:
+    args (list of :obj:`budou.chunk.Chunk`): Initial values included in the
+        list.
+  """
 
   def __init__(self, *args):
     self.list = list()
     self.extend(list(args))
 
-  def check(self, val):
+  def _check(self, val):
     if not isinstance(val, Chunk):
       raise TypeError
 
@@ -116,26 +166,28 @@ class ChunkList(collections.MutableSequence):
     del self.list[i]
 
   def __setitem__(self, i, v):
-    self.check(v)
+    self._check(v)
     self.list[i] = v
 
-  def insert(self, i, x):
-    self.check(x)
-    self.list.insert(i, x)
+  def insert(self, index, value):
+    self._check(value)
+    self.list.insert(index, value)
 
   def get_overlaps(self, offset, length):
     """Returns chunks overlapped with the given range.
+
     Args:
-      offset: Begin offset of the range. (int)
-      length: Length of the range. (int)
+      offset (int): Begin offset of the range.
+      length (int): Length of the range.
+
     Returns:
-      Overlapped chunks. (list of Chunk)
+      Overlapped chunks. (:obj:`budou.chunk.ChunkList`)
     """
     # In case entity's offset points to a space just before the entity.
     if ''.join([chunk.word for chunk in self])[offset] == ' ':
       offset += 1
     index = 0
-    result = []
+    result = ChunkList()
     for chunk in self:
       if offset < index + len(chunk.word) and index < offset + length:
         result.append(chunk)
@@ -144,9 +196,11 @@ class ChunkList(collections.MutableSequence):
 
   def swap(self, old_chunks, new_chunk):
     """Swaps old consecutive chunks with new chunk.
+
     Args:
-      old_chunks: List of consecutive Chunks to be removed. (list of Chunk)
-      new_chunk: A Chunk to be inserted. (Chunk)
+      old_chunks (:obj:`budou.chunk.ChunkList`): List of consecutive Chunks to
+          be removed.
+      new_chunk (:obj:`budou.chunk.Chunk`): A Chunk to be inserted.
     """
     indexes = [self.index(chunk) for chunk in old_chunks]
     del self[indexes[0]:indexes[-1] + 1]
@@ -154,10 +208,6 @@ class ChunkList(collections.MutableSequence):
 
   def resolve_dependencies(self):
     """Resolves chunk dependency by concatenating them.
-    Args:
-      chunks: a chink list. (ChunkList)
-    Returns:
-      A chunk list. (ChunkList)
     """
     self._concatenate_inner(True)
     self._concatenate_inner(False)
@@ -165,10 +215,9 @@ class ChunkList(collections.MutableSequence):
 
   def _concatenate_inner(self, direction):
     """Concatenates chunks based on each chunk's dependency.
+
     Args:
-      direction: Direction of concatenation process. True for forward. (bool)
-    Returns:
-      A chunk list. (ChunkList)
+      direction (bool): Direction of concatenation process. True for forward.
     """
     tmp_bucket = []
     source_chunks = self if direction else self[::-1]
@@ -198,10 +247,6 @@ class ChunkList(collections.MutableSequence):
 
   def _insert_breaklines(self):
     """Inserts a breakline instead of a trailing space if the chunk is in CJK.
-    Args:
-      chunks: a chunk list. (ChunkList)
-    Returns:
-      A chunk list. (ChunkList)
     """
     target_chunks = ChunkList()
     for chunk in self:
@@ -215,13 +260,12 @@ class ChunkList(collections.MutableSequence):
 
   def html_serialize(self, attributes, max_length=None):
     """Returns concatenated HTML code with SPAN tag.
+
     Args:
-      chunks: The list of chunks to be processed. (ChunkList)
-      attributes: If a dictionary, it should be a map of name-value pairs for
-          attributes of output SPAN tags. If a string, it should be a class name
-          of output SPAN tags. If an array, it should be a list of class names
-          of output SPAN tags. (str or dict or list of str)
-      max_length: Maximum length of span enclosed chunk. (int, optional)
+      attributes (dict): A map of name-value pairs for attributes of output
+          SPAN tags.
+      max_length (:obj:`int`, optional): Maximum length of span enclosed chunk.
+
     Returns:
       The organized HTML code. (str)
     """

@@ -160,6 +160,8 @@ class TestChunkList(unittest.TestCase):
         result, expected,
         'Chunks that exceed the max length should not be enclosed by a span.')
 
+  # TODO (tushuhei) Check if TypeError is raised when any instance but Chunk
+  # is given to the list.
 
 if __name__ == '__main__':
   unittest.main()

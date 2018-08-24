@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""budou:
+"""Budou
 
 Usage:
   budou <source> [--segmenter=<seg>] [--language=<lang>] [--classname=<class>]
@@ -23,9 +23,13 @@ Usage:
 
 Options:
   -h --help                   Show this screen.
+
   -v --version                Show version.
+
   --segmenter=<segmenter>     Segmenter to use [default: nlapi].
+
   --language=<language>       Language the source in.
+
   --classname=<classname>     Class name for output SPAN tags.
                               Use comma-separated value to specify multiple
                               classes.

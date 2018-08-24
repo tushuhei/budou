@@ -89,6 +89,7 @@ class NLAPISegmenter(Segmenter):
   Attributes:
     service: A resource object for interacting with Cloud Natural Language API.
     cache_filename (str): File path to the cache file.
+    supported_languages (list of str): List of supported languages' codes.
 
   Args:
       cache_filename (:obj:`str`, optional): File path to the pickle file for
@@ -145,8 +146,8 @@ class NLAPISegmenter(Segmenter):
     Args:
       input_text (str): Source string to segment.
       language (:obj:`str`, optional): A language code.
-      use_entity (:obj:`bool`, optional): Whether to use entity analysis results to
-                                   wrap entity names in the output.
+      use_entity (:obj:`bool`, optional): Whether to use entity analysis
+          results to wrap entity names in the output.
 
     Returns:
       A chunk list. (:obj:`budou.chunk.ChunkList`)
