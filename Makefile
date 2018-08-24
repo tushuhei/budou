@@ -24,6 +24,7 @@ install-mecab:
 test:
 	nosetests tests
 
-docs:
+doc:
+	make install; \
 	sphinx-apidoc -F -o docs/ budou/; \
 	sphinx-build -b html docs/ docs/_build/

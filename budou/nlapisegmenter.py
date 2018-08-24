@@ -14,6 +14,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Natural Language API based Segmenter.
+
+Word segmenter module powered by
+`Cloud Natural Language API <https://cloud.google.com/natural-language/>`_.
+You need to enable the API in your Google Cloud Platform project before you
+use this module.
+
+Example:
+  Once you enabled the API, download a service account's credentials and set
+  as `GOOGLE_APPLICATION_CREDENTIALS` environment variable.
+
+  .. code-block:: bash
+
+     $ export GOOGLE_APPLICATION_CREDENTIALS='/path/to/credentials.json'
+
+  Alternatively, you can also pass the path to your credentials file to the
+  module.
+
+  .. code-block:: python
+
+     segmenter = budou.segmenter.NLAPISegmenter(
+         service_account='/path/to/credentials.json')
+
+This module is equipped with caching system not to make multiple requests for
+the same source sentence because making request to the API may incur costs.
+The caching system is provided by `budou.cachefactory`, and a proper caching
+system is chosen to be used based on the environment.
+
+"""
+
 from __future__ import unicode_literals
 from builtins import str
 from .segmenter import Segmenter
@@ -21,76 +51,109 @@ from .cachefactory import load_cache
 from .chunk import Chunk, ChunkList
 import hashlib
 
-DEPENDENT_LABEL = (
+_DEPENDENT_LABEL = (
     'P', 'SNUM', 'PRT', 'AUX', 'SUFF', 'AUXPASS', 'RDROP', 'NUMBER', 'NUM',
     'PREF')
+""" list of str: Labels dependent to other parts.
+"""
 
-def memorize(func):
-  def wrapper(self, *args, **kwargs):
+
+def _memorize(func):
+  """Decorator to cache the given function's output.
+  """
+
+  def _wrapper(self, *args, **kwargs):
+    """Wrapper to cache the function's output.
+    """
     use_cache = kwargs.get('use_cache', True)
     if use_cache:
       cache = load_cache(self.cache_filename)
       original_key = ':'.join([
-        self.__class__.__name__,
-        func.__name__,
-        '_'.join([str(a) for a in args]),
-        '_'.join([str(w) for w in kwargs.values()])])
+          self.__class__.__name__,
+          func.__name__,
+          '_'.join([str(a) for a in args]),
+          '_'.join([str(w) for w in kwargs.values()])])
       cache_key = hashlib.md5(original_key.encode('utf-8')).hexdigest()
       cached_val = cache.get(cache_key)
       if cached_val:
         return cached_val
     val = func(self, *args, **kwargs)
-    if use_cache: cache.set(cache_key, val)
+    if use_cache:
+      cache.set(cache_key, val)
     return val
-  return wrapper
+  return _wrapper
 
 class NLAPISegmenter(Segmenter):
+  """Natural Language API Segmenter.
+
+  Attributes:
+    service: A resource object for interacting with Cloud Natural Language API.
+    cache_filename (str): File path to the cache file.
+
+  Args:
+      cache_filename (:obj:`str`, optional): File path to the pickle file for
+          caching. The file is created automatically if not exist. If the
+          environment is Google App Engine Standard Environment and memcache
+          service is available, it is used for caching and the pickle file
+          won't be generated.
+      service_account (:obj:`str`, optional): File path to the service
+          account's credentials file.
+      debug (:obj:`bool`, optional): If True, the module does not run
+          authentication and `service` remains `None`. This is useful when you
+          want to test the module without interacting with the API.
+  """
 
   supported_languages = {'ja', 'ko', 'zh', 'zh-TW', 'zh-CN', 'zh-HK'}
 
-  def __init__(self, options={}):
+  def __init__(self, cache_filename='/tmp/budou-cache.pickle',
+               service_account=None, debug=False):
 
     import google_auth_httplib2
     import googleapiclient.discovery
 
-    if 'debug' in options and options['debug']:
+    self.cache_filename = cache_filename
+
+    if debug:
       self.service = None
       return
 
-    self.cache_filename = options.get(
-        'cache_filename', '/tmp/budou-cache.pickle')
-
     scope = ['https://www.googleapis.com/auth/cloud-platform']
-    if 'service_account' in options:
+    if service_account:
       try:
         from google.oauth2 import service_account
         credentials = service_account.Credentials.from_service_account_file(
-            options['service_account'])
+            service_account)
         scoped_credentials = credentials.with_scopes(scope)
       except ImportError:
-        print('''Failed to load google.oauth2.service_account module.
-              If you are running this script in Google App Engine environment,
-              please call `authenticate` method with empty argument to
-              authenticate with default credentials.''')
+        print('Failed to load google.oauth2.service_account module. '
+              'If you are running this script in Google App Engine '
+              'environment, please call `authenticate` method with empty '
+              'argument to authenticate with default credentials.')
 
     else:
       import google.auth
-      scoped_credentials, project = google.auth.default(scope)
+      scoped_credentials, _ = google.auth.default(scope)
     authed_http = google_auth_httplib2.AuthorizedHttp(scoped_credentials)
     service = googleapiclient.discovery.build(
         'language', 'v1beta2', http=authed_http)
     self.service = service
 
   def segment(self, input_text, language=None, use_entity=False,
-      use_cache=True):
-    """Returns a chunk list by using Google Cloud Natural Language API.
+              use_cache=True):
+    """Returns a chunk list from the given sentence.
+
     Args:
-      input_text: String to parse. (str)
-      language: A language code. 'ja' and 'ko' are supported. (str, optional)
-      use_entity: Whether to use entities in Natural Language API response.
-      (bool, optional)
+      input_text (str): Source string to segment.
+      language (:obj:`str`, optional): A language code.
+      use_entity (:obj:`bool`, optional): Whether to use entity analysis results to
+                                   wrap entity names in the output.
+
     Returns:
-      A chunk list. (ChunkList)
+      A chunk list. (:obj:`budou.chunk.ChunkList`)
+
+    Raises:
+      ValueError: If :obj:`language` is given and it is not included in
+                  :obj:`supported_languages`.
     """
     if language and not language in self.supported_languages:
       raise ValueError(
@@ -107,12 +170,13 @@ class NLAPISegmenter(Segmenter):
 
   def _get_source_chunks(self, input_text, language=None, use_cache=True):
     """Returns a chunk list retrieved from Syntax Analysis results.
+
     Args:
-      input_text: Text to annotate. (str)
-      language: Language of the text. 'ja' and 'ko' are supported.
-          (str, optional)
+      input_text (str): Text to annotate.
+      language (:obj:`str`, optional): Language of the text.
+
     Returns:
-      A chunk list. (ChunkList)
+      A chunk list. (:obj:`budou.chunk.ChunkList`)
     """
     chunks = ChunkList()
     seek = 0
@@ -129,7 +193,7 @@ class NLAPISegmenter(Segmenter):
         chunks.append(Chunk.space())
         seek = begin_offset
       chunk = Chunk(word, pos, label)
-      if chunk.label in DEPENDENT_LABEL:
+      if chunk.label in _DEPENDENT_LABEL:
         # Determining concatenating direction based on syntax dependency.
         chunk.dependency = i < token['dependencyEdge']['headTokenIndex']
       if chunk.is_punct():
@@ -140,11 +204,13 @@ class NLAPISegmenter(Segmenter):
 
   def _group_chunks_by_entities(self, chunks, entities):
     """Groups chunks by entities retrieved from NL API Entity Analysis.
+
     Args:
-      chunks: The list of chunks to be processed. (ChunkList)
-      entities: List of entities. (list of dict)
+      chunks (:obj:`budou.chunk.ChunkList`): List of chunks to be processed.
+      entities (:obj:`list` of :obj:`dict`): List of entities.
+
     Returns:
-      A chunk list. (ChunkList)
+      A chunk list. (:obj:`budou.chunk.ChunkList`)
     """
     for entity in entities:
       chunks_to_concat = chunks.get_overlaps(
@@ -155,10 +221,9 @@ class NLAPISegmenter(Segmenter):
       chunks.swap(chunks_to_concat, new_chunk)
     return chunks
 
-  @memorize
-  def _get_annotations(self, text, language='', use_cache=True,
-      encoding='UTF32'):
-    """Returns the list of annotations from the given text."""
+  @_memorize
+  def _get_annotations(self, text, language='', use_cache=True):
+    """Returns the list of annotations retrieved from the given text."""
     body = {
         'document': {
             'type': 'PLAIN_TEXT',
@@ -167,7 +232,7 @@ class NLAPISegmenter(Segmenter):
         'features': {
             'extract_syntax': True,
         },
-        'encodingType': encoding,
+        'encodingType': 'UTF32',
     }
     if language: body['document']['language'] = language
 
@@ -178,15 +243,15 @@ class NLAPISegmenter(Segmenter):
 
     return {'tokens': tokens, 'language': language}
 
-  @memorize
-  def _get_entities(self, text, language='', use_cache=True, encoding='UTF32'):
-    """Returns the list of annotations from the given text."""
+  @_memorize
+  def _get_entities(self, text, language='', use_cache=True):
+    """Returns the list of entities retrieved from the given text."""
     body = {
         'document': {
             'type': 'PLAIN_TEXT',
             'content': text,
         },
-        'encodingType': encoding,
+        'encodingType': 'UTF32',
     }
     if language: body['document']['language'] = language
 
@@ -202,4 +267,3 @@ class NLAPISegmenter(Segmenter):
         result.append({'content': word, 'beginOffset': offset})
         offset += len(word)
     return result
-

@@ -20,11 +20,6 @@ import six
 @six.add_metaclass(ABCMeta)
 class Segmenter(object):
 
-  supported_languages = set()
-
-  def __init__():
-    pass
-
   @abstractmethod
   def segment(self, source):
     raise NotImplementedError()

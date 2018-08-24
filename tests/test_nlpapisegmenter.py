@@ -25,8 +25,7 @@ CASES_PATH = 'cases.ndjson'
 class TestNLAPISegmenter(unittest.TestCase):
 
   def setUp(self):
-    options = {'debug': True}
-    self.segmenter = budou.nlapisegmenter.NLAPISegmenter(options=options)
+    self.segmenter = budou.nlapisegmenter.NLAPISegmenter(debug=True)
     cases_path = os.path.join(os.path.dirname(__file__), CASES_PATH)
     with open(cases_path) as f:
       self.cases = [json.loads(row) for row in f.readlines() if row.strip()]
