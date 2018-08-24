@@ -14,11 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from builtins import str
 import collections
 from xml.etree import ElementTree as ET
-import html5lib
 import unicodedata
+import html5lib
 
 class Chunk(object):
   """Chunk object. This represents a unit for word segmentation.
@@ -85,16 +84,13 @@ class Chunk(object):
     return self.is_punct() and unicodedata.category(self.word) in {'Ps', 'Pi'}
 
   def has_cjk(self):
-    """Checks if the word of the chunk contains CJK characters
-    Using range from
+    """Checks if the word of the chunk contains CJK characters using ranges from
     https://github.com/nltk/nltk/blob/develop/nltk/tokenize/util.py#L149
     """
     for char in self.word:
-      if any([start <= ord(char) <= end for start, end in
-          [(4352, 4607), (11904, 42191), (43072, 43135), (44032, 55215),
-           (63744, 64255), (65072, 65103), (65381, 65500),
-           (131072, 196607)]
-          ]):
+      if any([start <= ord(char) <= end for start, end in [
+          (4352, 4607), (11904, 42191), (43072, 43135), (44032, 55215),
+          (63744, 64255), (65072, 65103), (65381, 65500), (131072, 196607)]]):
         return True
     return False
 
@@ -110,22 +106,22 @@ class ChunkList(collections.MutableSequence):
     if not isinstance(val, Chunk):
       raise TypeError
 
-  def __len__(self): return len(self.list)
+  def __len__(self):
+    return len(self.list)
 
-  def __getitem__(self, i): return self.list[i]
+  def __getitem__(self, i):
+    return self.list[i]
 
-  def __delitem__(self, i): del self.list[i]
+  def __delitem__(self, i):
+    del self.list[i]
 
   def __setitem__(self, i, v):
-      self.check(v)
-      self.list[i] = v
+    self.check(v)
+    self.list[i] = v
 
-  def insert(self, i, v):
-      self.check(v)
-      self.list.insert(i, v)
-
-  def __str__(self):
-      return str(self.list)
+  def insert(self, i, x):
+    self.check(x)
+    self.list.insert(i, x)
 
   def get_overlaps(self, offset, length):
     """Returns chunks overlapped with the given range.
@@ -179,22 +175,25 @@ class ChunkList(collections.MutableSequence):
     target_chunks = ChunkList()
     for chunk in source_chunks:
       if (
-            # if the chunk has matched dependency, do concatenation.
-            chunk.dependency == direction or
-            # if the chunk is SPACE, concatenate to the previous chunk.
-            (direction == False and chunk.is_space())
-        ):
+          # if the chunk has matched dependency, do concatenation.
+          chunk.dependency == direction or
+          # if the chunk is SPACE, concatenate to the previous chunk.
+          (direction is False and chunk.is_space())
+          ):
         tmp_bucket.append(chunk)
         continue
       tmp_bucket.append(chunk)
-      if not direction: tmp_bucket = tmp_bucket[::-1]
+      if not direction:
+        tmp_bucket = tmp_bucket[::-1]
       new_word = ''.join([tmp_chunk.word for tmp_chunk in tmp_bucket])
       new_chunk = Chunk(new_word, pos=chunk.pos, label=chunk.label,
-          dependency=chunk.dependency)
+                        dependency=chunk.dependency)
       target_chunks.append(new_chunk)
       tmp_bucket = ChunkList()
-    if tmp_bucket: target_chunks += tmp_bucket
-    if not direction: target_chunks = target_chunks[::-1]
+    if tmp_bucket:
+      target_chunks += tmp_bucket
+    if not direction:
+      target_chunks = target_chunks[::-1]
     self.list = target_chunks
 
   def _insert_breaklines(self):
@@ -240,11 +239,12 @@ class ChunkList(collections.MutableSequence):
             # But the space in " 你好" can be discarded.
             doc.text += ' '
       else:
-        if chunk.has_cjk() and not (max_length and len(chunk.word) > max_length):
+        if (chunk.has_cjk() and
+            not (max_length and len(chunk.word) > max_length)):
           ele = ET.Element('span')
           ele.text = chunk.word
-          for k, v in attributes.items():
-            ele.attrib[k] = v
+          for key, val in attributes.items():
+            ele.attrib[key] = val
           doc.append(ele)
         else:
           # add word without span tag for non-CJK text (e.g. English)
