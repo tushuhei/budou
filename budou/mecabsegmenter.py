@@ -14,16 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import unicode_literals
 from .segmenter import Segmenter
 from .chunk import Chunk, ChunkList
 import MeCab
 import six
 
 DEPENDENT_POS_FORWARD = set()
-DEPENDENT_POS_BACKWARD = {'助詞', '助動詞'}
+DEPENDENT_POS_BACKWARD = {u'助詞', u'助動詞'}
 DEPENDENT_LABEL_FORWARD = set()
-DEPENDENT_LABEL_BACKWARD = {'非自立'}
+DEPENDENT_LABEL_BACKWARD = {u'非自立'}
 
 class MecabSegmenter(Segmenter):
 
@@ -40,10 +39,11 @@ class MecabSegmenter(Segmenter):
 
     chunks = ChunkList()
     seek = 0
-    results = self.m.parse(
-        source.encode('utf-8') if six.PY2 else source).split('\n')[:-2]
+    source_str = source.encode('utf-8') if six.PY2 else source
+    results = self.m.parse(source_str).split('\n')[:-2]
     for row in results:
-      if six.PY2: row = row.decode('utf-8')
+      if six.PY2:
+        row = row.decode('utf-8')
       token = row.split('\t')
       word = token[0]
       labels = token[3].split('-')
