@@ -35,7 +35,7 @@ Example:
   .. code-block:: python
 
      segmenter = budou.segmenter.NLAPISegmenter(
-         service_account='/path/to/credentials.json')
+         credentials_path='/path/to/credentials.json')
 
 This module is equipped with caching system not to make multiple requests for
 the same source sentence because making request to the API may incur costs.
@@ -83,6 +83,7 @@ def _memorize(func):
     return val
   return _wrapper
 
+
 class NLAPISegmenter(Segmenter):
   """Natural Language API Segmenter.
 
@@ -97,7 +98,7 @@ class NLAPISegmenter(Segmenter):
           environment is Google App Engine Standard Environment and memcache
           service is available, it is used for caching and the pickle file
           won't be generated.
-      service_account (:obj:`str`, optional): File path to the service
+      credentials_path (:obj:`str`, optional): File path to the service
           account's credentials file.
       debug (:obj:`bool`, optional): If True, the module does not run
           authentication and `service` remains `None`. This is useful when you
@@ -107,7 +108,7 @@ class NLAPISegmenter(Segmenter):
   supported_languages = {'ja', 'ko', 'zh', 'zh-TW', 'zh-CN', 'zh-HK'}
 
   def __init__(self, cache_filename='/tmp/budou-cache.pickle',
-               service_account=None, debug=False):
+               credentials_path=None, debug=False):
 
     import google_auth_httplib2
     import googleapiclient.discovery
@@ -119,11 +120,11 @@ class NLAPISegmenter(Segmenter):
       return
 
     scope = ['https://www.googleapis.com/auth/cloud-platform']
-    if service_account:
+    if credentials_path:
       try:
         from google.oauth2 import service_account
         credentials = service_account.Credentials.from_service_account_file(
-            service_account)
+            credentials_path)
         scoped_credentials = credentials.with_scopes(scope)
       except ImportError:
         print('Failed to load google.oauth2.service_account module. '

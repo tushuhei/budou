@@ -26,12 +26,26 @@ DEFAULT_CLASS_NAME = 'chunk'
 
 @six.add_metaclass(ABCMeta)
 class Parser(object):
+  """Abstract parser class:
 
-  def __init__(self, options=None):
-    self.options = options
+  Args:
+    segmenter(:obj:`budou.segmenter.Segmenter`): Segmenter module.
+  """
 
   def parse(self, source, attributes={}, language=None, max_length=None,
-      classname=None):
+            classname=None):
+    """Parses the source sentence to output organized HTML code.
+
+    Args:
+      source (str): Source sentence to process.
+      attributes (:obj:`dict`, optional): Attributes for output SPAN tags.
+      language (:obj:`str`, optional): Language code.
+      max_length (:obj:`int`, optional): Maximum length of a chunk.
+
+    Returns:
+      A dictionary containing :code:`chunks` (:obj:`budou.chunk.ChunkList`)
+      and :code:`html_code` (:obj:`str`).
+    """
     attributes = parse_attributes(attributes, classname)
     source = preprocess(source)
     chunks = self.segmenter.segment(source, language)
@@ -43,31 +57,60 @@ class Parser(object):
 
 
 class NLAPIParser(Parser):
+  """Parser built on Cloud Language API Segmenter
+  (:obj:`budou.nlapisegmenter.NLAPISegmenter`).
 
-  def __init__(self, options=None):
-    super(NLAPIParser, self).__init__(options)
-    self.segmenter = NLAPISegmenter()
+  Args:
+    options (dict, optional): Optional settings. :code:`cache_filename` is for
+      the file path to the cache file. :code:`credentials_path` is for the file
+      path to the service account's credentials file.
+
+  Attributes:
+    segmenter(:obj:`budou.nlapisegmenter.NLAPISegmenter`): Segmenter module.
+  """
+
+  def __init__(self, options={}):
+    self.segmenter = NLAPISegmenter(
+        cache_filename=options.get('cache_filename', None),
+        credentials_path=options.get('credentials_path', None))
 
 
 class MecabParser(Parser):
+  """Parser built on Mecab Segmenter
+  (:obj:`budou.mecabsegmenter.MecabSegmenter`).
 
-  def __init__(self, options=None):
-    super(MecabParser, self).__init__(options)
+  Attributes:
+    segmenter(:obj:`budou.mecabsegmenter.MecabSegmenter`): Segmenter module.
+  """
+
+  def __init__(self):
     self.segmenter = MecabSegmenter()
 
 
 def parse_attributes(attributes={}, classname=None):
+  """Parses attributes,
+
+  Args:
+    attributes (dict): Input attributes.
+    classname (:obj:`str`, optional): Class name of output SPAN tags.
+
+  Returns:
+    Parsed attributes. (dict)
+  """
   attributes.setdefault('class', DEFAULT_CLASS_NAME)
   # If `classname` is specified, it overwrites `class` property in `attributes`.
-  if classname: attributes['class'] = classname
+  if classname:
+    attributes['class'] = classname
   return attributes
 
 def preprocess(source):
   """Removes unnecessary break lines and white spaces.
+
   Args:
-    source: HTML code to be processed. (str)
+    source (str): Input sentence.
+
   Returns:
-    Preprocessed HTML code. (str)
+    Preprocessed sentence. (str)
   """
   doc = html5lib.parseFragment(source)
   source = ET.tostring(doc, encoding='utf-8', method='text').decode('utf-8')

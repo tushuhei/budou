@@ -1,6 +1,6 @@
 language: python
 
-# Cache our Gcloud SDK between commands
+# Cache gcloud SDK
 cache:
   directories:
     - "$HOME/google-cloud-sdk/"

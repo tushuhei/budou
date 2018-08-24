@@ -56,17 +56,16 @@ def main():
   print(result['html_code'])
   sys.exit()
 
-def parse(source, segmenter='nlapi', language=None, classname=None,
-          options=None):
+def parse(source, segmenter='nlapi', language=None, classname=None, options={}):
   parser = get_parser(segmenter, options=options)
   return parser.parse(source, language=language, classname=classname)
 
 def authenticate(json_path=None):
-  options = {'service_account': json_path}
+  options = {'credentials_path': json_path}
   parser = NLAPIParser(options)
   return parser
 
-def get_parser(segmenter, options=None):
+def get_parser(segmenter, options={}):
   parser = None
   if segmenter == 'nlapi':
     parser = NLAPIParser(options=options)
