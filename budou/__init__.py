@@ -14,7 +14,8 @@
 # limitations under the License.
 
 """Package indicator for budou."""
-from .budou import parse, get_parser
+from .budou import parse, get_parser, authenticate
 
 parse = parse
 get_parser = get_parser
+authenticate = authenticate

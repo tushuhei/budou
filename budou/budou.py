@@ -55,6 +55,11 @@ def parse(source, segmenter='nlapi', language=None, classname=None,
   parser = get_parser(segmenter, options=options)
   return parser.parse(source, language=language, classname=classname)
 
+def authenticate(json_path=None):
+  options = {'service_account': json_path}
+  parser = NLAPIParser(options)
+  return parser
+
 def get_parser(segmenter, options=None):
   parser = None
   if segmenter == 'nlapi':
