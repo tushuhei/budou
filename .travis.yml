@@ -18,7 +18,8 @@ python:
 install:
 - pip install setuptools
 - sudo apt-get install automake
-- sudo make init-dev
+- sudo make install-mecab
+- pip install mecab-python3
 
 script:
 - python setup.py test

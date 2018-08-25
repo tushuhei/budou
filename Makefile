@@ -1,11 +1,6 @@
 init:
 	pip install -r requirements.txt
 
-init-dev:
-	make init
-	pip install -r requirements_dev.txt
-	make install-mecab
-
 install:
 	python setup.py install
 
@@ -21,7 +16,6 @@ install-mecab:
 	make; \
 	sudo make install; \
 	mecab --version; \
-	pip install mecab-python3
 
 doc:
 	make install; \
