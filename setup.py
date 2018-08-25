@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import codecs
 import os
 from setuptools import setup
 
 def read_file(name):
-  with open(os.path.join(os.path.dirname(__file__), name), 'r') as f:
+  with codecs.open(
+      os.path.join(os.path.dirname(__file__), name), 'r', 'utf-8') as f:
     return f.read().strip()
 
 about = {}
@@ -35,7 +37,7 @@ setup(
     packages=['budou'],
     install_requires=read_file('requirements.txt').splitlines(),
     tests_require=read_file('requirements_dev.txt').splitlines(),
-    long_description=open('README.md').read(),
+    long_description=read_file('README.md'),
     long_description_content_type='text/markdown',
     test_suite='tests',
     classifiers=[
