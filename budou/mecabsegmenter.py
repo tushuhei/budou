@@ -24,6 +24,7 @@ script will download source codes from GitHub and build the tool. It also setup
 Japanese.
 """
 
+import logging
 import six
 from .segmenter import Segmenter
 from .chunk import Chunk, ChunkList
@@ -44,8 +45,15 @@ class MecabSegmenter(Segmenter):
   supported_languages = {'ja'}
 
   def __init__(self):
-    import MeCab
-    self.tagger = MeCab.Tagger('-Ochasen')
+    try:
+      import MeCab
+      self.tagger = MeCab.Tagger('-Ochasen')
+    except ImportError:
+      logging.error(
+          ('mecab-python3 is not installed. Install the module by running '
+           '`$ pip install mecab-python3`. If MeCab is not installed in your '
+           'system yet, run `$ make install-mecab` instead.'))
+
 
   def segment(self, source, language=None):
     """Returns a chunk list from the given sentence.

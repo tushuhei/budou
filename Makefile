@@ -1,3 +1,15 @@
+init:
+	pip install -r requirements.txt
+
+init-dev:
+	pip install -r requirements_dev.txt
+
+test:
+	python setup.py test
+
+install:
+	python setup.py install
+
 install-mecab:
 	git clone https://github.com/taku910/mecab.git; \
 	cd mecab/mecab; \
@@ -11,8 +23,9 @@ install-mecab:
 	make; \
 	sudo make install; \
 	mecab --version; \
+	pip install mecab-python3
 
 doc:
-	make install; \
+	make init-dev; \
 	sphinx-apidoc -F -o docs/ budou/; \
 	sphinx-build -b html docs/ docs/_build/

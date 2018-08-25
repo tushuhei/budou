@@ -20,7 +20,6 @@ python:
 install:
 - pip install setuptools
 - make install-mecab
-- pip install mecab-python3
 
 script:
 - python setup.py test
