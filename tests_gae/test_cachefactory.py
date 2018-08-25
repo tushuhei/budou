@@ -17,7 +17,7 @@
 from google.appengine.api import memcache
 from google.appengine.ext import testbed
 from google.appengine.ext import vendor
-vendor.add("lib")
+vendor.add('lib')
 import budou
 import unittest
 
@@ -37,8 +37,8 @@ class TestGAECacheFactory(unittest.TestCase):
     del self.cache
 
   def test_load(self):
-    self.assertEqual('<AppEngineCache>', repr(self.cache),
-        'Under GAE environment, AppEngineCache should be loaded.')
+    self.assertEqual('<AppEngineMemcache>', repr(self.cache),
+        'Under GAE environment, AppEngineMemcache should be loaded.')
 
   def test_set_and_get(self):
     source = 'apple'

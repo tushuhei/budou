@@ -16,7 +16,9 @@
 """Package indicator for budou."""
 from .budou import parse, authenticate
 from .parser import get_parser
+from .cachefactory import load_cache
 
 parse = parse
 get_parser = get_parser
 authenticate = authenticate
+load_cache = load_cache

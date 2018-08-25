@@ -33,5 +33,5 @@ script:
   fi
 - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then
     pip install -t lib -r requirements.txt;
-    python gae_test_runner.py ${GAE_PYTHONPATH} --test-path=tests_gae;
+    python gae_test_runner.py ${GAE_PYTHONPATH} --test-path=tests_gae --test-pattern=test_*.py;
   fi
