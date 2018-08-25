@@ -1,9 +1,3 @@
-init:
-	pip install -r requirements.txt
-
-install:
-	python setup.py install
-
 install-mecab:
 	git clone https://github.com/taku910/mecab.git; \
 	cd mecab/mecab; \

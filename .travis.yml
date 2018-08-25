@@ -17,8 +17,7 @@ python:
 
 install:
 - pip install setuptools
-- sudo apt-get install automake
-- sudo make install-mecab
+- make install-mecab
 - pip install mecab-python3
 
 script:
