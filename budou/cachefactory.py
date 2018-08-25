@@ -19,7 +19,17 @@ import pickle
 import six
 
 
-def load_cache(filename):
+def load_cache(filename=None):
+  """Loads cache system.
+
+  If Google App Engine Standard Environment's memcache is available, this uses
+  memcache as the backend. Otherwise, this uses :obj:`pickle` to cache
+  the outputs in the local file system.
+
+  Args:
+    filename (:obj:`str`, optional): The file path to the cache file. This is
+        used only when :obj:`pickle` is used as the backend.
+  """
   try:
     return AppEngineMemcache()
   except ImportError:
@@ -27,23 +37,67 @@ def load_cache(filename):
 
 
 @six.add_metaclass(ABCMeta)
-class BudouCache(object):
+class BudouCache:
+  """Base class for cache system.
+  """
 
   @abstractmethod
   def get(self, key):
-    pass
+    """Abstract method: Gets a value by a key.
+
+    Args:
+      key (str): Key to retrieve the value.
+
+    Returns:
+      Retrieved value.
+
+    Raises:
+      NotImplementedError: If it's not implemented.
+    """
+    raise NotImplementedError()
 
   @abstractmethod
   def set(self, key, val):
-    pass
+    """Abstract method: Sets a value in a key.
+
+    Args:
+      key (str): Key for the value.
+      val: Value to set.
+
+    Returns:
+      Retrieved value.
+
+    Raises:
+      NotImplementedError: If it's not implemented.
+    """
+    raise NotImplementedError()
 
 
 class PickleCache(BudouCache):
+  """Cache system with :obj:`pickle` backend.
+
+  Args:
+    filename (str): The file path to the cache file.
+
+  Attributes:
+    filename (str): The file path to the cache file.
+  """
+
+  DEFAULT_FILE_NAME = '/tmp/budou-cache.pickle'
+  """ The default path to the cache file.
+  """
 
   def __init__(self, filename):
-    self.filename = filename
+    self.filename = filename if filename else self.DEFAULT_FILE_NAME
 
   def get(self, key):
+    """Gets a value by a key.
+
+    Args:
+      key (str): Key to retrieve the value.
+
+    Returns: Retrieved value.
+    """
     if not os.path.exists(self.filename):
       return None
     with open(self.filename, 'rb') as cache_file:
@@ -54,6 +108,15 @@ class PickleCache(BudouCache):
       return cache_pickle.get(key, None)
 
   def set(self, key, val):
+    """Sets a value in a key.
+
+    Args:
+      key (str): Key for the value.
+      val: Value to set.
+
+    Returns:
+      Retrieved value.
+    """
     with open(self.filename, 'w+b') as cache_file:
       try:
         cache_pickle = pickle.load(cache_file)
@@ -65,13 +128,35 @@ class PickleCache(BudouCache):
 
 
 class AppEngineMemcache(BudouCache):
+  """Cache system with :obj:`google.appengine.api.memcache` backend.
+
+  Attributes:
+    memcache (:obj:`google.appengine.api.memcache`): Memcache service.
+  """
 
   def __init__(self):
     from google.appengine.api import memcache
     self.memcache = memcache
 
   def get(self, key):
+    """Gets a value by a key.
+
+    Args:
+      key (str): Key to retrieve the value.
+
+    Returns:
+      Retrieved value.
+    """
     return self.memcache.get(key, None)
 
   def set(self, key, val):
+    """Sets a value in a key.
+
+    Args:
+      key (str): Key for the value.
+      val: Value to set.
+
+    Returns:
+      Retrieved value.
+    """
     self.memcache.set(key, val)

@@ -20,8 +20,8 @@
 # -- Project information -----------------------------------------------------
 
 project = 'budou'
-copyright = '2018, Author'
-author = 'Author'
+copyright = '2018, Google LLC'
+author = 'Shuhei Iitsuka'
 
 # The short X.Y version
 version = ''
@@ -133,7 +133,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'budou.tex', 'budou Documentation',
-     'Author', 'manual'),
+     author, 'manual'),
 ]
 
 

@@ -46,10 +46,10 @@ system is chosen to be used based on the environment.
 
 from __future__ import unicode_literals
 from builtins import str
+import hashlib
 from .segmenter import Segmenter
 from .cachefactory import load_cache
 from .chunk import Chunk, ChunkList
-import hashlib
 
 _DEPENDENT_LABEL = (
     'P', 'SNUM', 'PRT', 'AUX', 'SUFF', 'AUXPASS', 'RDROP', 'NUMBER', 'NUM',
@@ -107,8 +107,7 @@ class NLAPISegmenter(Segmenter):
 
   supported_languages = {'ja', 'ko', 'zh', 'zh-TW', 'zh-CN', 'zh-HK'}
 
-  def __init__(self, cache_filename='/tmp/budou-cache.pickle',
-               credentials_path=None, debug=False):
+  def __init__(self, cache_filename=None, credentials_path=None, debug=False):
 
     import google_auth_httplib2
     import googleapiclient.discovery
@@ -140,12 +139,12 @@ class NLAPISegmenter(Segmenter):
         'language', 'v1beta2', http=authed_http)
     self.service = service
 
-  def segment(self, input_text, language=None, use_entity=False,
+  def segment(self, source, language=None, use_entity=False,
               use_cache=True):
     """Returns a chunk list from the given sentence.
 
     Args:
-      input_text (str): Source string to segment.
+      source (str): Source string to segment.
       language (:obj:`str`, optional): A language code.
       use_entity (:obj:`bool`, optional): Whether to use entity analysis
           results to wrap entity names in the output.
@@ -162,10 +161,10 @@ class NLAPISegmenter(Segmenter):
           'Language {} is not supported by NLAPI segmenter'.format(language))
 
     chunks, language = self._get_source_chunks(
-        input_text, language=language, use_cache=use_cache)
+        source, language=language, use_cache=use_cache)
     if use_entity:
       entities = self._get_entities(
-          input_text, language=language, use_cache=use_cache)
+          source, language=language, use_cache=use_cache)
       chunks = self._group_chunks_by_entities(chunks, entities)
     chunks.resolve_dependencies()
     return chunks
@@ -217,7 +216,8 @@ class NLAPISegmenter(Segmenter):
     for entity in entities:
       chunks_to_concat = chunks.get_overlaps(
           entity['beginOffset'], len(entity['content']))
-      if not chunks_to_concat: continue
+      if not chunks_to_concat:
+        continue
       new_chunk_word = u''.join([chunk.word for chunk in chunks_to_concat])
       new_chunk = Chunk(new_chunk_word)
       chunks.swap(chunks_to_concat, new_chunk)
@@ -225,7 +225,17 @@ class NLAPISegmenter(Segmenter):
 
   @_memorize
   def _get_annotations(self, text, language='', use_cache=True):
-    """Returns the list of annotations retrieved from the given text."""
+    """Returns the list of annotations retrieved from the given text.
+
+    Args:
+      text (str): Input text.
+      language (:obj:`str`, optional): Language code.
+      use_cache (:obj:`bool`, optional): Whether to use a cache system.
+
+    Returns:
+      Results in a dictionary. :code:`tokens` contains the list of annotations
+      and :code:`language` contains the inferred language from the input.
+    """
     body = {
         'document': {
             'type': 'PLAIN_TEXT',
@@ -236,7 +246,8 @@ class NLAPISegmenter(Segmenter):
         },
         'encodingType': 'UTF32',
     }
-    if language: body['document']['language'] = language
+    if language:
+      body['document']['language'] = language
 
     request = self.service.documents().annotateText(body=body)
     response = request.execute()
@@ -247,7 +258,16 @@ class NLAPISegmenter(Segmenter):
 
   @_memorize
   def _get_entities(self, text, language='', use_cache=True):
-    """Returns the list of entities retrieved from the given text."""
+    """Returns the list of entities retrieved from the given text.
+
+    Args:
+      text (str): Input text.
+      language (:obj:`str`, optional): Language code.
+      use_cache (:obj:`bool`, optional): Whether to use a cache system.
+
+    Returns:
+      List of entities.
+    """
     body = {
         'document': {
             'type': 'PLAIN_TEXT',
@@ -255,14 +275,16 @@ class NLAPISegmenter(Segmenter):
         },
         'encodingType': 'UTF32',
     }
-    if language: body['document']['language'] = language
+    if language:
+      body['document']['language'] = language
 
     request = self.service.documents().analyzeEntities(body=body)
     response = request.execute()
     result = []
     for entity in response.get('entities', []):
       mentions = entity.get('mentions', [])
-      if not mentions: continue
+      if not mentions:
+        continue
       entity_text = mentions[0]['text']
       offset = entity_text['beginOffset']
       for word in entity_text['content'].split():

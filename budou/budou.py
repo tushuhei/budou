@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Budou
+"""Budou: an automatic organizer tool for beautiful line breaking in CJK
 
 Usage:
   budou <source> [--segmenter=<seg>] [--language=<lang>] [--classname=<class>]
@@ -38,11 +38,16 @@ Options:
 from __future__ import print_function
 
 import sys
+import warnings
 from docopt import docopt
 from .parser import NLAPIParser, MecabParser
 from .__version__ import __version__
 
+AVAILABLE_SEGMENTERS = {'nlapi', 'mecab'}
+
 def main():
+  """Budou main method for the command line tool.
+  """
   args = docopt(__doc__)
   if args['--version']:
     print(__version__)
@@ -56,21 +61,71 @@ def main():
   print(result['html_code'])
   sys.exit()
 
-def parse(source, segmenter='nlapi', language=None, classname=None, options={}):
+def parse(source, segmenter='nlapi', language=None, classname=None,
+          options=None):
+  """Parses input source.
+
+  Args:
+    source (str): Input source to process.
+    segmenter (:obj:`str`, optional): Segmenter to use [default: nlapi].
+    language (:obj:`str`, optional): Language code.
+    classname (:obj:`str`, optional): Class name of output SPAN tags.
+    options (:obj:`dict`, optional): Optional settings to pass to the segmenter.
+
+  Returns:
+    Results in a dict. :code:`chunks` holds a list of chunks
+    (:obj:`budou.chunk.ChunkList`) and :code:`html_code` holds the output HTML
+    code.
+  """
   parser = get_parser(segmenter, options=options)
   return parser.parse(source, language=language, classname=classname)
 
-def authenticate(json_path=None):
-  options = {'credentials_path': json_path}
-  parser = NLAPIParser(options)
-  return parser
+def get_parser(segmenter, options=None):
+  """Gets a parser.
 
-def get_parser(segmenter, options={}):
+  Args:
+    segmenter (str): Segmenter to use.
+    language (:obj:`str`, optional): Language code.
+    classname (:obj:`str`, optional): Class name of output SPAN tags.
+    options (:obj:`dict`, optional): Optional settings to pass to the segmenter.
+
+  Returns:
+    Results in a dict. :code:`chunks` holds a list of chunks
+    (:obj:`budou.chunk.ChunkList`) and :code:`html_code` holds the output HTML
+    code.
+
+  Raises:
+    ValueError: If unsupported segmenter is specified.
+  """
   parser = None
   if segmenter == 'nlapi':
     parser = NLAPIParser(options=options)
   elif segmenter == 'mecab':
-    parser = MecabParser(options=options)
+    parser = MecabParser()
+  else:
+    raise ValueError('Segmenter {} is not supported.'.format(segmenter))
+
+  return parser
+
+def authenticate(json_path=None):
+  """Gets a Natural Language API parser by authenticating the API.
+
+  **This method is deprecated.** Please use :obj:`budou.get_parser` to obtain a
+  parser instead.
+
+  Args:
+    json_path (:obj:`str`, optional): The file path to the service account's
+        credentials.
+
+  Returns:
+    Parser. (:obj:`budou.parser.NLAPIParser`)
+
+  """
+  msg = ('budou.authentication() is deprecated. '
+         'Please use budou.get_parser() to obtain a parser instead.')
+  warnings.warn(msg, DeprecationWarning)
+  options = {'credentials_path': json_path}
+  parser = NLAPIParser(options)
   return parser
 
 if __name__ == '__main__':

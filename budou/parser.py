@@ -13,26 +13,49 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Parser modules.
 
-from abc import ABCMeta, abstractmethod
-import six
+Parser modules are equipped with :code:`parse` method and it processes the
+input text into a list of chunks and an organized HTML snippet.
+
+Examples:
+
+  .. code-block:: python
+
+     import budou
+     parser = budou.get_parser('nlapi')
+     results = parser.parse('Google Home を使った。', classname='w')
+     print(results['html_code'])
+     # <span>Google <span class="w">Home を</span>
+     # <span class="w">使った。</span></span>
+
+     chunks = results['chunks']
+     print(chunks[1].word)  # Home を
+
+"""
+
+from abc import ABCMeta
 import re
-import html5lib
 from xml.etree import ElementTree as ET
+import six
+import html5lib
 from .mecabsegmenter import MecabSegmenter
 from .nlapisegmenter import NLAPISegmenter
 
 DEFAULT_CLASS_NAME = 'chunk'
 
 @six.add_metaclass(ABCMeta)
-class Parser(object):
+class Parser:
   """Abstract parser class:
 
   Args:
     segmenter(:obj:`budou.segmenter.Segmenter`): Segmenter module.
   """
 
-  def parse(self, source, attributes={}, language=None, max_length=None,
+  def __init__(self):
+    self.segmenter = None
+
+  def parse(self, source, attributes=None, language=None, max_length=None,
             classname=None):
     """Parses the source sentence to output organized HTML code.
 
@@ -69,7 +92,9 @@ class NLAPIParser(Parser):
     segmenter(:obj:`budou.nlapisegmenter.NLAPISegmenter`): Segmenter module.
   """
 
-  def __init__(self, options={}):
+  def __init__(self, options=None):
+    if options is None:
+      options = {}
     self.segmenter = NLAPISegmenter(
         cache_filename=options.get('cache_filename', None),
         credentials_path=options.get('credentials_path', None))
@@ -87,7 +112,7 @@ class MecabParser(Parser):
     self.segmenter = MecabSegmenter()
 
 
-def parse_attributes(attributes={}, classname=None):
+def parse_attributes(attributes=None, classname=None):
   """Parses attributes,
 
   Args:
@@ -97,6 +122,8 @@ def parse_attributes(attributes={}, classname=None):
   Returns:
     Parsed attributes. (dict)
   """
+  if not attributes:
+    attributes = {}
   attributes.setdefault('class', DEFAULT_CLASS_NAME)
   # If `classname` is specified, it overwrites `class` property in `attributes`.
   if classname:

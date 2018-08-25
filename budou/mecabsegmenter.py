@@ -18,16 +18,16 @@
 
 Word segmenter module powered by `MeCab <https://github.com/taku910/mecab>`_.
 You need to install MeCab to use this segmenter.
-The easiest way to install MeCab is to run :code:`make install-mecab`. The script
-will download source codes from GitHub and build the tool. It also setup
+The easiest way to install MeCab is to run :code:`make install-mecab`. The
+script will download source codes from GitHub and build the tool. It also setup
 `IPAdic <https://ja.osdn.net/projects/ipadic/>`_, a standard dictionary for
 Japanese.
 """
 
-from .segmenter import Segmenter
-from .chunk import Chunk, ChunkList
 import MeCab
 import six
+from .segmenter import Segmenter
+from .chunk import Chunk, ChunkList
 
 _DEPENDENT_POS_FORWARD = set()
 _DEPENDENT_POS_BACKWARD = {u'助詞', u'助動詞'}
@@ -100,4 +100,3 @@ class MecabSegmenter(Segmenter):
       seek += len(word)
     chunks.resolve_dependencies()
     return chunks
-
