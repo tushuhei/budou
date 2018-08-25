@@ -5,7 +5,7 @@ install-mecab:
 	make; \
 	make check; \
 	sudo make install; \
-	ldconfig; \
+	sudo ldconfig; \
 	cd ../mecab-ipadic; \
 	./configure --with-charset=utf8; \
 	make; \
