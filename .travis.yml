@@ -16,6 +16,7 @@ python:
 
 install:
 - pip install setuptools
+- make install-mecab
 
 script:
 - python setup.py test
