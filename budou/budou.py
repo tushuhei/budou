@@ -40,7 +40,7 @@ from __future__ import print_function
 import sys
 import warnings
 from docopt import docopt
-from .parser import NLAPIParser, MecabParser
+from .parser import get_parser
 from .__version__ import __version__
 
 AVAILABLE_SEGMENTERS = {'nlapi', 'mecab'}
@@ -80,33 +80,6 @@ def parse(source, segmenter='nlapi', language=None, classname=None,
   parser = get_parser(segmenter, options=options)
   return parser.parse(source, language=language, classname=classname)
 
-def get_parser(segmenter, options=None):
-  """Gets a parser.
-
-  Args:
-    segmenter (str): Segmenter to use.
-    language (:obj:`str`, optional): Language code.
-    classname (:obj:`str`, optional): Class name of output SPAN tags.
-    options (:obj:`dict`, optional): Optional settings to pass to the segmenter.
-
-  Returns:
-    Results in a dict. :code:`chunks` holds a list of chunks
-    (:obj:`budou.chunk.ChunkList`) and :code:`html_code` holds the output HTML
-    code.
-
-  Raises:
-    ValueError: If unsupported segmenter is specified.
-  """
-  parser = None
-  if segmenter == 'nlapi':
-    parser = NLAPIParser(options=options)
-  elif segmenter == 'mecab':
-    parser = MecabParser()
-  else:
-    raise ValueError('Segmenter {} is not supported.'.format(segmenter))
-
-  return parser
-
 def authenticate(json_path=None):
   """Gets a Natural Language API parser by authenticating the API.
 
@@ -125,7 +98,7 @@ def authenticate(json_path=None):
          'Please use budou.get_parser() to obtain a parser instead.')
   warnings.warn(msg, DeprecationWarning)
   options = {'credentials_path': json_path}
-  parser = NLAPIParser(options)
+  parser = get_parser('nlpapi', options=options)
   return parser
 
 if __name__ == '__main__':

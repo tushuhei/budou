@@ -39,8 +39,6 @@ import re
 from xml.etree import ElementTree as ET
 import six
 import html5lib
-from .mecabsegmenter import MecabSegmenter
-from .nlapisegmenter import NLAPISegmenter
 
 DEFAULT_CLASS_NAME = 'chunk'
 
@@ -93,6 +91,7 @@ class NLAPIParser(Parser):
   """
 
   def __init__(self, options=None):
+    from .nlapisegmenter import NLAPISegmenter
     if options is None:
       options = {}
     self.segmenter = NLAPISegmenter(
@@ -109,8 +108,33 @@ class MecabParser(Parser):
   """
 
   def __init__(self):
+    from .mecabsegmenter import MecabSegmenter
     self.segmenter = MecabSegmenter()
 
+
+def get_parser(segmenter, options=None):
+  """Gets a parser.
+
+  Args:
+    segmenter (str): Segmenter to use.
+    language (:obj:`str`, optional): Language code.
+    classname (:obj:`str`, optional): Class name of output SPAN tags.
+    options (:obj:`dict`, optional): Optional settings to pass to the segmenter.
+
+  Returns:
+    Results in a dict. :code:`chunks` holds a list of chunks
+    (:obj:`budou.chunk.ChunkList`) and :code:`html_code` holds the output HTML
+    code.
+
+  Raises:
+    ValueError: If unsupported segmenter is specified.
+  """
+  if segmenter == 'nlapi':
+    return NLAPIParser(options=options)
+  elif segmenter == 'mecab':
+    return MecabParser()
+  else:
+    raise ValueError('Segmenter {} is not supported.'.format(segmenter))
 
 def parse_attributes(attributes=None, classname=None):
   """Parses attributes,
