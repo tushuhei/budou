@@ -13,11 +13,12 @@ python:
 - "2.7"
 - "3.4"
 - "3.5"
+- "3.6"
 
 install:
 - pip install setuptools
 - sudo apt-get install automake
-- make install-mecab
+- sudo make init-dev
 
 script:
 - python setup.py test

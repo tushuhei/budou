@@ -23,9 +23,6 @@ install-mecab:
 	mecab --version; \
 	pip install mecab-python3
 
-test:
-	nosetests tests
-
 doc:
 	make install; \
 	sphinx-apidoc -F -o docs/ budou/; \
