@@ -20,6 +20,8 @@ install-mecab:
 	./configure --with-charset=utf8; \
 	make; \
 	sudo make install; \
+	mecab --version; \
+	pip install mecab-python3
 
 test:
 	nosetests tests
