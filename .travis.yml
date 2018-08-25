@@ -1,7 +1,5 @@
 language: python
 
-sudo: required
-
 # Cache gcloud SDK
 cache:
   directories:

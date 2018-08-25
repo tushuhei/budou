@@ -4,11 +4,12 @@ install-mecab:
 	./configure  --enable-utf8-only; \
 	make; \
 	make check; \
-	sudo make install; \
+	make install; \
+	ldconfig; \
 	cd ../mecab-ipadic; \
 	./configure --with-charset=utf8; \
 	make; \
-	sudo make install; \
+	make install; \
 	mecab --version; \
 
 doc:
