@@ -25,6 +25,7 @@ Japanese.
 """
 
 import logging
+import sys
 import six
 from .segmenter import Segmenter
 from .chunk import Chunk, ChunkList
@@ -53,7 +54,7 @@ class MecabSegmenter(Segmenter):
           ('mecab-python3 is not installed. Install the module by running '
            '`$ pip install mecab-python3`. If MeCab is not installed in your '
            'system yet, run `$ make install-mecab` instead.'))
-
+      sys.exit(1)
 
   def segment(self, source, language=None):
     """Returns a chunk list from the given sentence.
