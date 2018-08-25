@@ -39,6 +39,8 @@ import re
 from xml.etree import ElementTree as ET
 import six
 import html5lib
+from .nlapisegmenter import NLAPISegmenter
+from .mecabsegmenter import MecabSegmenter
 
 DEFAULT_CLASS_NAME = 'chunk'
 
@@ -91,7 +93,6 @@ class NLAPIParser(Parser):
   """
 
   def __init__(self, options=None):
-    from .nlapisegmenter import NLAPISegmenter
     if options is None:
       options = {}
     self.segmenter = NLAPISegmenter(
@@ -108,7 +109,6 @@ class MecabParser(Parser):
   """
 
   def __init__(self):
-    from .mecabsegmenter import MecabSegmenter
     self.segmenter = MecabSegmenter()
 
 

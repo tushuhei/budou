@@ -24,7 +24,6 @@ script will download source codes from GitHub and build the tool. It also setup
 Japanese.
 """
 
-import MeCab
 import six
 from .segmenter import Segmenter
 from .chunk import Chunk, ChunkList
@@ -45,6 +44,7 @@ class MecabSegmenter(Segmenter):
   supported_languages = {'ja'}
 
   def __init__(self):
+    import MeCab
     self.tagger = MeCab.Tagger('-Ochasen')
 
   def segment(self, source, language=None):
