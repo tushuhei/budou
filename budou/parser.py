@@ -57,20 +57,22 @@ class Parser:
     self.segmenter = None
 
   def parse(self, source, language=None, classname=None, max_length=None,
-            attributes=None):
+            attributes=None, inline_style=False):
     """Parses the source sentence to output organized HTML code.
 
     Args:
-      source (str): Source sentence to process.
+      source (:obj:`str`): Source sentence to process.
       language (:obj:`str`, optional): Language code.
       max_length (:obj:`int`, optional): Maximum length of a chunk.
       attributes (:obj:`dict`, optional): Attributes for output SPAN tags.
+      inline_style (:obj:`bool`, optional): Put `display:inline-block` in inline
+                                            style attribute of output SPAN tags.
 
     Returns:
       A dictionary containing :code:`chunks` (:obj:`budou.chunk.ChunkList`)
       and :code:`html_code` (:obj:`str`).
     """
-    attributes = parse_attributes(attributes, classname)
+    attributes = parse_attributes(attributes, classname, inline_style)
     source = preprocess(source)
     chunks = self.segmenter.segment(source, language)
     html_code = chunks.html_serialize(attributes, max_length=max_length)
@@ -157,11 +159,11 @@ def get_parser(segmenter, **options):
   else:
     raise ValueError('Segmenter {} is not supported.'.format(segmenter))
 
-def parse_attributes(attributes=None, classname=None):
+def parse_attributes(attributes=None, classname=None, inline_style=False):
   """Parses attributes,
 
   Args:
-    attributes (dict): Input attributes.
+    attributes (:obj:`dict`): Input attributes.
     classname (:obj:`str`, optional): Class name of output SPAN tags.
 
   Returns:
@@ -172,7 +174,10 @@ def parse_attributes(attributes=None, classname=None):
   attributes.setdefault('class', DEFAULT_CLASS_NAME)
   # If `classname` is specified, it overwrites `class` property in `attributes`.
   if classname:
-    attributes['class'] = classname
+    attributes['class'] = ' '.join(classname.split(','))
+  if inline_style:
+    attributes.setdefault('style', '')
+    attributes['style'] += 'display:inline-block'
   return attributes
 
 def preprocess(source):

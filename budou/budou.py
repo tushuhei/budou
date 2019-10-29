@@ -17,7 +17,7 @@
 """Budou: an automatic organizer tool for beautiful line breaking in CJK
 
 Usage:
-  budou <source> [--segmenter=<seg>] [--language=<lang>] [--classname=<class>]
+  budou <source> [--segmenter=<seg>] [--language=<lang>] [--classname=<class>] [--inline-style]
   budou -h | --help
   budou -v | --version
 
@@ -30,9 +30,11 @@ Options:
 
   --language=<language>       Language the source in.
 
-  --classname=<classname>     Class name for output SPAN tags.
-                              Use comma-separated value to specify multiple
-                              classes.
+  --classname=<classname>     Class name for output SPAN tags. Use
+                              comma-separated value to specify multiple classes.
+
+  --inline-style              Put display:inline-block in inline style
+                              attributes of output SPAN tags.
 """
 
 from __future__ import print_function
@@ -57,21 +59,25 @@ def main():
       args['<source>'],
       segmenter=args['--segmenter'],
       language=args['--language'],
-      classname=args['--classname'])
+      classname=args['--classname'],
+      inline_style=args['--inline-style'],
+      )
   print(result['html_code'])
   sys.exit()
 
 def parse(source, segmenter='nlapi', language=None, max_length=None,
-          classname=None, attributes=None, **kwargs):
+          classname=None, attributes=None, inline_style=False, **kwargs):
   """Parses input source.
 
   Args:
-    source (str): Input source to process.
+    source (:obj:`str`): Input source to process.
     segmenter (:obj:`str`, optional): Segmenter to use [default: nlapi].
     language (:obj:`str`, optional): Language code.
     max_length (:obj:`int`, optional): Maximum length of a chunk.
     classname (:obj:`str`, optional): Class name of output SPAN tags.
     attributes (:obj:`dict`, optional): Attributes for output SPAN tags.
+    inline_style (:obj:`bool`, optional): Put display:inline-block in inline
+                                          style attribute.
 
   Returns:
     Results in a dict. :code:`chunks` holds a list of chunks
@@ -81,7 +87,7 @@ def parse(source, segmenter='nlapi', language=None, max_length=None,
   parser = get_parser(segmenter, **kwargs)
   return parser.parse(
       source, language=language, max_length=max_length, classname=classname,
-      attributes=attributes)
+      attributes=attributes, inline_style=inline_style)
 
 def authenticate(json_path=None):
   """Gets a Natural Language API parser by authenticating the API.
